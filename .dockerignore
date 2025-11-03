@@ -12,7 +12,10 @@ build
 venv
 env
 ENV
-output/*
+# 原来是 output/* → 改成目录忽略
+output/
+# 新增：数据目录构建时不需要（运行时用卷挂载）
+data/
 *.log
 .git
 .gitignore
