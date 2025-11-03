@@ -1,31 +1,32 @@
-version: '3.8'
+version: "3.8"
 
 services:
   web:
-    build: .
+    build:
+      context: .
     container_name: volleyball-app
     ports:
       - "5000:5000"
     volumes:
-      - ./output:/app/output  # 挂载输出目录，方便查看生成的视频
-      - ./data:/app/data       # 挂载数据目录
+      - ./output:/app/output   # 生成物
+      - ./data:/app/data       # 数据
     environment:
+      # 可按需调参；保持保守默认
+      - WEB_CONCURRENCY=1
+      - WEB_THREADS=2
+      - GUNICORN_TIMEOUT=120
+      - OMP_NUM_THREADS=1
+      - MKL_NUM_THREADS=1
+      - NUMEXPR_NUM_THREADS=1
+      - MALLOC_ARENA_MAX=2
       - PYTHONUNBUFFERED=1
-    restart: unless-stopped
-    # 资源限制（根据服务器配置调整）
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 4G
-        reservations:
-          cpus: '1'
-          memory: 2G
-    # 健康检查
+    # 关键：不要自启动，避免开机/daemon重启时“内存爆炸”
+    restart: "no"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
-
+    # 如需进一步保险：手动启动时再带 --profile（可选）
+    profiles: ["manual"]
