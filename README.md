@@ -32,6 +32,8 @@
 
 ## 🚀 快速开始
 
+> 💡 **提示**：以下步骤适用于本地开发环境。如需部署到服务器，请查看 [部署指南](#🚀-部署指南)。
+
 ### 环境要求
 - Python 3.8+
 - pip
@@ -74,14 +76,22 @@ pip install -r requirements.txt
 ```bash
 # Flask API 服务器（推荐）
 python run_flask.py
-
-# 或 Streamlit 应用
-streamlit run app.py
 ```
 
 5. **访问系统**
-   - Flask API: 打开浏览器访问 `http://localhost:5000`
-   - Streamlit: 打开浏览器访问 `http://localhost:8501`
+   
+   打开浏览器访问 `http://localhost:5000`
+
+---
+
+### ✅ API 地址配置说明
+
+**已自动配置**：前端使用相对路径 `/api`，自动适配当前域名。
+
+- ✅ 本地开发：`http://localhost:5000` → API: `http://localhost:5000/api`
+- ✅ 服务器部署：`http://your-server.com` → API: `http://your-server.com/api`
+
+**无需手动配置，自动适配！**
 
 ---
 
@@ -217,18 +227,18 @@ volleyball-ai-training/
 - **Python 3.8+**: 主要开发语言
 
 ### 前端技术
-- **Streamlit**: Web应用框架
-- **Plotly**: 交互式数据可视化
-- **CSS3**: 现代化UI样式
+- **原生 JavaScript**: 纯前端实现，无需构建工具
+- **HTML5 & CSS3**: 现代化UI样式
+- **相对路径API**: 自动适配本地开发或服务器部署
 
 ### 架构设计
 ```
 ┌─────────────────┐
-│   Streamlit UI  │  ← 前端展示层
+│  Frontend (HTML) │  ← 前端展示层（使用相对路径API）
 └────────┬────────┘
          │
 ┌────────▼────────┐
-│   API Layer     │  ← 接口层
+│   Flask API     │  ← API接口层（RESTful）
 └────────┬────────┘
          │
 ┌────────▼────────┐
@@ -279,6 +289,122 @@ volleyball-ai-training/
 
 ### v1.0.0
 - 🎯 基础姿态识别与评分功能
+
+---
+
+## 🚀 部署指南
+
+> 💡 **提示**：部署到服务器前，请先完成[快速开始](#🚀-快速开始)中的基础配置（克隆项目、安装依赖、配置环境变量）。
+
+### 服务器部署步骤
+
+#### 1. 完成基础配置
+
+按照[快速开始](#🚀-快速开始)部分完成：
+- ✅ 克隆项目到服务器
+- ✅ 安装依赖（`pip install -r requirements.txt`）
+- ✅ 配置 `.env` 文件（设置 API Key）
+
+#### 2. 启动服务
+
+根据您的需求选择启动方式：
+
+**方式 1：直接运行（简单测试）**
+```bash
+python run_flask.py
+```
+⚠️ 注意：这种方式仅适用于简单测试，不适合生产环境。
+
+**方式 2：使用 Gunicorn（生产环境，推荐）**
+```bash
+# 安装 Gunicorn
+pip install gunicorn
+
+# 启动服务（4个工作进程）
+gunicorn -w 4 -b 0.0.0.0:5000 "run_flask:app"
+```
+
+**方式 3：使用 Nginx + Gunicorn（生产环境，最佳实践）**
+
+1. 启动 Gunicorn（后台运行）：
+```bash
+gunicorn -w 4 -b 127.0.0.1:5000 "run_flask:app" --daemon
+```
+
+2. 配置 Nginx 反向代理：
+
+创建 Nginx 配置文件（如 `/etc/nginx/sites-available/volleyball`）：
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;  # 替换为您的域名
+
+    location / {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # WebSocket 支持（如果需要）
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
+```
+
+3. 启用配置并重启 Nginx：
+```bash
+sudo ln -s /etc/nginx/sites-available/volleyball /etc/nginx/sites-enabled/
+sudo nginx -t  # 测试配置
+sudo systemctl restart nginx
+```
+
+#### 3. 验证部署
+
+1. **访问服务**
+   - 如果使用方式1/2：访问 `http://your-server-ip:5000`
+   - 如果使用方式3：访问 `http://your-domain.com`
+
+2. **检查 API 连接**
+   - 打开浏览器开发者工具（F12）
+   - 查看 Network 标签页
+   - 确认 API 请求发送到正确地址（如 `http://your-server.com/api/health`）
+   - 检查请求是否成功（状态码 200）
+
+3. **验证功能**
+   - 测试视频上传和分析功能
+   - 测试 AI 教练功能
+   - 检查控制台是否有错误信息
+
+### 常见部署问题
+
+#### Q: 前端能显示，但后端功能全部调用失败？
+
+**A:** 这是典型的 API 地址配置问题。已解决：
+- ✅ 前端已改为相对路径 `/api`
+- ✅ 自动适配当前域名
+- ✅ 无需手动配置
+
+如果仍有问题，检查：
+1. 后端服务是否正常运行
+2. 浏览器控制台是否有 CORS 错误
+3. 网络请求是否发送到正确的地址
+
+#### Q: 如何确认 API 地址配置正确？
+
+**A:** 打开浏览器开发者工具（F12）：
+1. 查看 Network 标签页
+2. 找到 API 请求（如 `/api/health`）
+3. 确认请求地址为：`http://your-server.com/api/...`（而不是 `http://localhost:5000/api/...`）
+
+#### Q: 部署后需要修改哪些配置？
+
+**A:** 
+- ✅ 无需修改前端代码（已使用相对路径）
+- ✅ 只需配置 `.env` 文件中的 API Key
+- ✅ 后端路由无需修改（已正确配置）
 
 ---
 
