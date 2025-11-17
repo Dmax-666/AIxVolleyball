@@ -381,6 +381,7 @@ def get_tactics_questions():
     import json
 
     module = request.args.get('module')
+    role = request.args.get('role')
     file_map = {
         '位置与职责': Path('data/volley_questions.json'),
     }
@@ -393,6 +394,15 @@ def get_tactics_questions():
         # 确保返回结构统一为 {"questions": [...]}
         if isinstance(data, list):
             data = {'questions': data}
+        questions = data.get('questions', [])
+
+        if module == '位置与职责' and role:
+            filtered = [q for q in questions if q.get('role') == role]
+            if filtered:
+                data['questions'] = filtered
+            else:
+                # 如果未找到匹配职位的题目，回退到完整题库以避免空题集
+                data['questions'] = questions
         return jsonify(data)
     else:
         return jsonify({

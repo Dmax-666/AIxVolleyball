@@ -8,8 +8,9 @@
 async function startTacticsTestModule() {
     // 获取题库
     const moduleName = AppState.tacticsTest.currentModule || '基础轮转规则';
-    const tacticsData = await api.getTacticsQuestions(moduleName);
-    
+    const roleName = moduleName === '位置与职责' ? getSelectedRoleName() : undefined;
+    const tacticsData = await api.getTacticsQuestions(moduleName, roleName);
+
     if (tacticsData.error) {
         showToast('获取题库失败，请稍后重试', 'error');
         return;
@@ -54,6 +55,31 @@ if (typeof window !== 'undefined') {
 function selectRandomQuestions(questions, count) {
     const shuffled = [...questions].sort(() => Math.random() - 0.5);
     return shuffled.slice(0, count);
+}
+
+/**
+ * 获取当前选定角色的中文名称，用于匹配题库中的 role 字段
+ */
+function getSelectedRoleName() {
+    const positionRoles = {
+        outside: '主攻',
+        middle: '副攻',
+        setter: '二传',
+        opposite: '接应',
+        libero: '自由人',
+        defensive: '防守队员'
+    };
+
+    if (AppState.selectedPosition && positionRoles[AppState.selectedPosition]) {
+        return positionRoles[AppState.selectedPosition];
+    }
+
+    const mainPos = AppState.user.mainPosition;
+    if (mainPos && Object.values(positionRoles).includes(mainPos)) {
+        return mainPos;
+    }
+
+    return '';
 }
 
 /**
