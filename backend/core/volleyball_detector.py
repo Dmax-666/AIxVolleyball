@@ -265,7 +265,7 @@ class VolleyballDetector:
     def detect_batch(
         self,
         frames: Sequence[np.ndarray],
-        max_yolo_batch: int = 128,   # ✅ YOLO 实际 batch 大小
+        max_yolo_batch: int = 64,   # ✅ YOLO 实际 batch 大小
     ) -> List[List[VolleyballDetection]]:
         """
         批量检测：对一组帧做并行预测（内部再切小 batch）
