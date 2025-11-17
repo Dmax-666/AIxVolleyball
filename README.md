@@ -43,7 +43,7 @@
 1. **克隆项目**
 ```bash
 git clone <repository-url>
-cd volleyball-ai-training
+cd VolleyGo
 ```
 
 2. **安装依赖**
@@ -51,7 +51,7 @@ cd volleyball-ai-training
 pip install -r requirements.txt
 ```
 
-3. **配置环境变量**（重要！）
+1. **配置环境变量**
    
    项目使用环境变量管理 API Key，避免敏感信息泄露。
    
@@ -72,13 +72,13 @@ pip install -r requirements.txt
    
    📖 详细配置说明请查看 [配置指南](CONFIGURATION_GUIDE.md)
 
-4. **启动应用**
+2. **启动应用**
 ```bash
 # Flask API 服务器（推荐）
 python run_flask.py
 ```
 
-5. **访问系统**
+1. **访问系统**
    
    打开浏览器访问 `http://localhost:5000`
 
@@ -98,7 +98,7 @@ python run_flask.py
 ## 📂 项目结构
 
 ```
-volleyball-ai-training/
+VolleyGo/
 │
 ├── app.py                      # Streamlit主应用入口
 ├── requirements.txt            # 项目依赖
