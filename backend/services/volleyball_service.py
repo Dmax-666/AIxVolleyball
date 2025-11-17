@@ -13,22 +13,27 @@ from backend.core import (
     PoseDetector, 
     VideoProcessor, 
     VolleyballScorer,
+    VolleyballScorerV2,
+    VolleyballScorerV3,
     SequenceAnalyzer,
     TrajectoryVisualizer,
-    VideoGenerator
+    VideoGenerator,
+    VolleyballDetector,
+    VolleyballDetection
 )
-from backend.core.scorer_v2 import VolleyballScorerV2
 from config.settings import TEMPLATES_DIR, DEFAULT_TEMPLATE
+import cv2
 
 
 class VolleyballService:
     """排球动作识别服务类"""
     
-    def __init__(self, use_v2_scorer=True):
+    def __init__(self, scorer_version='v3', enable_ball_detection=True):
         """初始化服务
         
         Args:
-            use_v2_scorer: 是否使用优化版评分器（默认True）
+            scorer_version: 评分器版本 ('v1', 'v2', 'v3')，默认 'v3'
+            enable_ball_detection: 是否启用球体检测（仅V3支持），默认True
         """
         self.pose_detector = PoseDetector()
         self.video_processor = VideoProcessor()
@@ -40,16 +45,41 @@ class VolleyballService:
             template_path = Path("template.json")
         
         # 选择评分器版本
-        if use_v2_scorer:
+        self.scorer_version = scorer_version
+        if scorer_version == 'v3':
+            self.scorer = VolleyballScorerV3(template_path=str(template_path))
+            print("✅ 使用智能评分系统 V3（支持人球位置评分）")
+        elif scorer_version == 'v2':
             self.scorer = VolleyballScorerV2(template_path=str(template_path))
             print("✅ 使用优化版评分系统 V2")
         else:
             self.scorer = VolleyballScorer(template_path=str(template_path))
+            print("✅ 使用基础评分系统 V1")
         
         self.sequence_analyzer = SequenceAnalyzer()
         self.trajectory_visualizer = TrajectoryVisualizer()
         self.video_generator = VideoGenerator()
-        self.use_v2_scorer = use_v2_scorer
+        
+        # 球体检测器（仅在V3且启用时初始化）
+        self.enable_ball_detection = enable_ball_detection and scorer_version == 'v3'
+        if self.enable_ball_detection:
+            try:
+                # VolleyballDetector 自动使用默认配置（YOLOv7）
+                # 不需要传递 backend 参数，它内部会设置
+                self.ball_detector = VolleyballDetector(
+                    score_threshold=0.45,  # 检测置信度阈值
+                    max_results=3          # 最多返回3个检测结果
+                )
+                print("✅ 球体检测已启用（YOLOv7）")
+            except Exception as e:
+                print(f"⚠️ 球体检测初始化失败: {e}")
+                print("   将继续使用仅人体姿态的评分模式")
+                import traceback
+                traceback.print_exc()
+                self.enable_ball_detection = False
+                self.ball_detector = None
+        else:
+            self.ball_detector = None
     
     def analyze_single_frame(self, image):
         """
@@ -63,6 +93,7 @@ class VolleyballService:
                 - landmarks: 关键点数据
                 - score: 评分结果
                 - pose_image: 标注后的图像
+                - ball_detection: 球体检测结果（如果启用）
         """
         try:
             # 检测姿态（返回tuple: landmarks, annotated_image）
@@ -77,14 +108,32 @@ class VolleyballService:
                     "pose_image": image
                 }
             
+            # 球体检测（如果启用）
+            ball_detection = None
+            if self.enable_ball_detection and self.ball_detector:
+                try:
+                    # 使用 detect() 方法而不是 detect_ball()
+                    ball_detections = self.ball_detector.detect(image)
+                    if ball_detections and len(ball_detections) > 0:
+                        # 使用置信度最高的检测结果
+                        ball_detection = max(ball_detections, key=lambda x: x.score)
+                except Exception as e:
+                    print(f"⚠️ 球体检测失败: {e}")
+            
             # 评分
-            score_result = self.scorer.score_pose(landmarks)
+            if self.scorer_version == 'v3':
+                # V3支持球体检测
+                score_result = self.scorer.score_pose_with_ball(landmarks, ball_detection)
+            else:
+                # V1/V2使用原有评分方法
+                score_result = self.scorer.score_pose(landmarks)
             
             return {
                 "success": True,
                 "landmarks": landmarks,
                 "score": score_result,
-                "pose_image": pose_image
+                "pose_image": pose_image,
+                "ball_detection": ball_detection
             }
         except Exception as e:
             return {
@@ -140,9 +189,113 @@ class VolleyballService:
                 "error": f"视频分析失败: {str(e)}"
             }
     
+    def _analyze_video_sequence_with_ball(self, video_path):
+        """带球体检测的序列分析（V3专用）"""
+        try:
+            print("🎬 开始视频序列分析（含球体检测）...")
+            
+            # 打开视频
+            cap = cv2.VideoCapture(video_path)
+            if not cap.isOpened():
+                return {
+                    "success": False,
+                    "error": "无法打开视频文件"
+                }
+            
+            # 获取视频信息
+            fps = int(cap.get(cv2.CAP_PROP_FPS))
+            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            
+            # 每隔几帧采样一次（避免处理过多帧）
+            sample_interval = max(1, fps // 5)  # 每秒采样5帧
+            
+            frames_data = []
+            frame_idx = 0
+            
+            while cap.isOpened():
+                ret, frame = cap.read()
+                if not ret:
+                    break
+                
+                # 采样
+                if frame_idx % sample_interval == 0:
+                    # 人体检测
+                    landmarks, annotated_image = self.pose_detector.detect_pose(frame)
+                    
+                    # 球体检测
+                    ball_detection = None
+                    if self.ball_detector and landmarks:
+                        try:
+                            # 使用 detect() 方法
+                            ball_detections = self.ball_detector.detect(frame)
+                            if ball_detections and len(ball_detections) > 0:
+                                ball_detection = max(ball_detections, key=lambda x: x.score)
+                        except Exception as e:
+                            print(f"⚠️ 第{frame_idx}帧球体检测失败: {e}")
+                    
+                    frames_data.append({
+                        'landmarks': landmarks,
+                        'ball': ball_detection,
+                        'frame': annotated_image,
+                        'frame_idx': frame_idx
+                    })
+                
+                frame_idx += 1
+            
+            cap.release()
+            
+            if not frames_data:
+                return {
+                    "success": False,
+                    "error": "未能提取有效帧"
+                }
+            
+            print(f"✅ 已处理 {len(frames_data)} 帧")
+            
+            # 使用V3评分器进行序列评分
+            sequence_result = self.scorer.score_sequence_with_ball(frames_data)
+            
+            # 构建返回结果
+            best_frame_idx = sequence_result.get('best_frame_idx', 0)
+            best_frame_data = frames_data[best_frame_idx]
+            
+            return {
+                "success": True,
+                "analysis_mode": "sequence_with_ball",
+                "score": {
+                    'total_score': sequence_result['total_score'],
+                    'arm_score': sequence_result.get('arm_score', 0),
+                    'body_score': sequence_result.get('body_score', 0),
+                    'position_score': sequence_result.get('position_score', 0),
+                    'ball_score': sequence_result.get('ball_score', 0),
+                    'stability_score': sequence_result.get('stability_score', 0),
+                    'feedback': sequence_result.get('feedback', [])
+                },
+                "best_frame_idx": best_frame_idx,
+                "pose_image": best_frame_data['frame'],
+                "landmarks": best_frame_data['landmarks'],
+                "ball_detection": best_frame_data['ball'],
+                "ball_detection_rate": sequence_result.get('ball_detection_rate', 0),
+                "has_ball_frames": sequence_result.get('has_ball_frames', 0),
+                "total_frames": len(frames_data),
+                "video_info": self.video_processor.get_video_info(video_path)
+            }
+            
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return {
+                "success": False,
+                "error": f"带球检测的序列分析失败: {str(e)}"
+            }
+    
     def _analyze_video_sequence(self, video_path):
         """序列模式分析视频"""
         try:
+            # V3版本：同时检测人和球
+            if self.scorer_version == 'v3' and self.enable_ball_detection:
+                return self._analyze_video_sequence_with_ball(video_path)
+            
             # 使用序列分析器
             analysis_result = self.sequence_analyzer.analyze_sequence(video_path)
             
@@ -153,8 +306,8 @@ class VolleyballService:
             frames_data = analysis_result.get("frames_data", [])
             landmarks_sequence = [frame.get("landmarks") for frame in frames_data if frame.get("landmarks")]
             
-            # 如果使用V2评分器，进行序列评分
-            if self.use_v2_scorer and len(landmarks_sequence) > 0:
+            # 如果使用V2/V3评分器，进行序列评分
+            if self.scorer_version in ['v2', 'v3'] and len(landmarks_sequence) > 0:
                 # 使用V2的序列评分功能
                 sequence_score_result = self.scorer.score_sequence(landmarks_sequence)
                 

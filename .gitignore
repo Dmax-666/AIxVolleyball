@@ -74,3 +74,9 @@ data/uploads/
 *.log
 logs/
 
+*.md
+!README.md
+
+test_ball_detector.py
+test_scorer_v3.py
+test_scorer_v3_simple.py

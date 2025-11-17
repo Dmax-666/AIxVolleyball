@@ -12,6 +12,8 @@ import tempfile
 import base64
 import cv2
 import numpy as np
+from PIL import Image
+import io
 
 # 加载环境变量
 try:
@@ -106,7 +108,8 @@ CORS(app)  # 允许跨域请求
 
 # 初始化API
 volleyball_api = VolleyballAPI()
-volleyball_service = VolleyballService(use_v2_scorer=True)
+# 使用 V3 智能评分系统（支持人球位置评分）
+volleyball_service = VolleyballService(scorer_version='v3', enable_ball_detection=True)
 
 # 允许的文件扩展名
 ALLOWED_EXTENSIONS = {'mp4', 'avi', 'mov', 'mkv'}
@@ -172,18 +175,24 @@ def analyze_video():
             # 调用服务分析视频
             result = volleyball_service.analyze_video(temp_path, mode=analysis_mode)
             
-            # 将图像转换为base64 - 添加类型检查
+            # 将图像转换为base64 - 修复颜色问题
             if result.get('pose_image') is not None:
                 pose_img = result['pose_image']
                 # 确保是numpy array
                 if isinstance(pose_img, np.ndarray) and pose_img.size > 0:
                     try:
+                        # BGR → RGB 转换
                         pose_img_rgb = cv2.cvtColor(pose_img, cv2.COLOR_BGR2RGB)
-                        _, buffer = cv2.imencode('.jpg', pose_img_rgb)
-                        pose_img_base64 = base64.b64encode(buffer).decode('utf-8')
+                        # 使用 PIL 编码（避免 cv2.imencode 的 BGR 假设问题）
+                        pil_img = Image.fromarray(pose_img_rgb)
+                        buffer = io.BytesIO()
+                        pil_img.save(buffer, format='JPEG', quality=95)
+                        pose_img_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
                         result['pose_image_base64'] = pose_img_base64
                     except Exception as e:
                         print(f"警告：姿态图像转换失败: {str(e)}")
+                        import traceback
+                        traceback.print_exc()
                 # 删除numpy array，不能JSON序列化
                 if 'pose_image' in result:
                     del result['pose_image']
@@ -192,15 +201,19 @@ def analyze_video():
             if result.get('landmarks') is not None:
                 result['landmarks'] = str(result['landmarks'])
             
-            # 处理轨迹图 - 添加类型检查
+            # 处理轨迹图 - 修复颜色问题
             if result.get('trajectory_plot') is not None:
                 traj_img = result['trajectory_plot']
                 # 确保是numpy array
                 if isinstance(traj_img, np.ndarray) and traj_img.size > 0:
                     try:
+                        # BGR → RGB 转换
                         traj_img_rgb = cv2.cvtColor(traj_img, cv2.COLOR_BGR2RGB)
-                        _, buffer = cv2.imencode('.jpg', traj_img_rgb)
-                        traj_img_base64 = base64.b64encode(buffer).decode('utf-8')
+                        # 使用 PIL 编码
+                        pil_img = Image.fromarray(traj_img_rgb)
+                        buffer = io.BytesIO()
+                        pil_img.save(buffer, format='JPEG', quality=95)
+                        traj_img_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
                         result['trajectory_plot_base64'] = traj_img_base64
                     except Exception as e:
                         print(f"警告：轨迹图像转换失败: {str(e)}")
@@ -208,7 +221,7 @@ def analyze_video():
                 if 'trajectory_plot' in result:
                     del result['trajectory_plot']
             
-            # 处理annotated_frames（序列分析模式下可能有多个帧）
+            # 处理annotated_frames（序列分析模式下可能有多个帧）- 修复颜色问题
             if result.get('annotated_frames') is not None:
                 # 只保留最佳帧
                 if isinstance(result['annotated_frames'], list) and len(result['annotated_frames']) > 0:
@@ -217,9 +230,13 @@ def analyze_video():
                         best_frame = result['annotated_frames'][best_idx]
                         if isinstance(best_frame, np.ndarray) and best_frame.size > 0:
                             try:
+                                # BGR → RGB 转换
                                 best_frame_rgb = cv2.cvtColor(best_frame, cv2.COLOR_BGR2RGB)
-                                _, buffer = cv2.imencode('.jpg', best_frame_rgb)
-                                result['pose_image_base64'] = base64.b64encode(buffer).decode('utf-8')
+                                # 使用 PIL 编码
+                                pil_img = Image.fromarray(best_frame_rgb)
+                                buffer = io.BytesIO()
+                                pil_img.save(buffer, format='JPEG', quality=95)
+                                result['pose_image_base64'] = base64.b64encode(buffer.getvalue()).decode('utf-8')
                             except:
                                 pass
                 # 删除annotated_frames
