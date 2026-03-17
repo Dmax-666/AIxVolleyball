@@ -85,11 +85,4 @@ API_CONFIG = {
     "cors_origins": ["*"]
 }
 
-# Streamlit 配置
-STREAMLIT_CONFIG = {
-    "page_title": "🏐 排球AI训练系统",
-    "page_icon": "🏐",
-    "layout": "wide",
-    "initial_sidebar_state": "expanded"
-}
 

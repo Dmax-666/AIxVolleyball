@@ -61,9 +61,3 @@ pip install -r requirements.txt
 ```bash
 python run_flask.py
 ```
-
-或
-
-```bash
-streamlit run app.py
-```

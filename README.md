@@ -1,479 +1,259 @@
-# 🏐 排球AI训练系统 v3.0
+# AIxVolleyball
 
-**AI-Powered Volleyball Training System**
+基于 AI 的排球训练与教学系统，提供视频动作分析、连续帧评估、可视化视频生成和 AI 教练问答能力。
 
-一个基于人工智能的排球垫球动作识别与训练系统，帮助排球爱好者提升技术水平。
+当前项目是 **Flask 单体服务架构**：
+- Flask 同时提供前端静态页面和后端 REST API
+- 前端为 `HTML + Tailwind CDN + 原生 JavaScript`
+- 后端为 `API 层 + Service 层 + Core 算法层`
 
----
+## 架构总览
 
-## ✨ 主要特性
+```text
+Browser
+  -> Flask (backend/api/flask_api.py)
+      -> /                静态前端 (frontend/)
+      -> /api/*           REST API
+           -> Service     (backend/services/)
+           -> Core        (backend/core/)
+                - MediaPipe 姿态检测
+                - YOLOv7/Roboflow 排球检测
+                - V1/V2/V3 评分器
+                - 序列分析与轨迹可视化
+```
 
-### 🎯 核心功能
-- **智能姿态识别**: 基于MediaPipe的33点人体姿态检测
-- **多维度评分**: 手臂姿态、身体重心、触球位置、整体稳定性4个维度全面评估
-- **双模式分析**: 
-  - 单帧快速分析：提取关键帧，3秒出结果
-  - 连续帧深度分析：完整动作序列，流畅度、完整性、一致性多维评估
-- **智能反馈**: AI精准定位问题，提供个性化改进建议
-- **游戏化关卡**: 初级(50分)、中级(70分)、高级(85分)循序渐进
+## 核心能力
 
-### 🎬 可视化功能
-- **骨架叠加**: 在原视频上叠加姿态骨架
-- **纯骨架动画**: 白色背景抽象骨架展示
-- **左右对比**: 原视频与骨架并排对比
-- **轨迹追踪**: 实时绘制关键点运动路径
+- 视频动作分析（单帧 / 连续帧）
+- 姿态打分（手臂、重心、触球位置、稳定性）
+- V3 智能评分（支持人球位置关系）
+- 可视化视频生成（骨架叠加 / 纯骨架 / 对比 / 轨迹）
+- AI 教练问答（OpenAI 兼容接口）
+- 战术题库接口（按模块与角色筛选）
 
-### 🏗️ 专业架构
-- **前后端分离**: 清晰的模块化设计
-- **三层架构**: API层、服务层、核心层
-- **易于扩展**: 组件化开发，便于维护和升级
+## 目录结构（与当前代码一致）
 
----
+```text
+AIxVolleyball/
+├─ run_flask.py
+├─ requirement.txt
+├─ CONFIGURATION_GUIDE.md
+├─ backend/
+│  ├─ api/
+│  │  ├─ flask_api.py
+│  │  └─ volleyball_api.py
+│  ├─ services/
+│  │  └─ volleyball_service.py
+│  └─ core/
+│     ├─ pose_detector.py
+│     ├─ volleyball_detector.py
+│     ├─ scorer.py / scorer_v2.py / scorer_v3.py
+│     ├─ sequence_analyzer.py
+│     ├─ trajectory_visualizer.py
+│     └─ video_generator.py
+├─ frontend/
+│  ├─ index.html
+│  └─ js/
+│     ├─ app.js
+│     ├─ api.js
+│     ├─ tactics.js
+│     ├─ pages.js
+│     └─ components.js
+├─ config/
+│  └─ settings.py
+├─ data/
+│  ├─ tactics_questions.json
+│  ├─ volley_questions.json
+│  ├─ templates/
+│  └─ models/
+├─ output/
+└─ docker/
+   ├─ Dockerfile
+   └─ docker-compose.yml
+```
 
-## 🚀 快速开始
+## 环境要求
 
-> 💡 **提示**：以下步骤适用于本地开发环境。如需部署到服务器，请查看 [部署指南](#🚀-部署指南)。
-
-### 环境要求
-- Python 3.8+
+- Python 3.9+（建议）
 - pip
+- 建议具备 FFmpeg/OpenCV 运行环境（Docker 已内置）
 
-### 安装步骤
+## 快速开始（本地）
 
-1. **克隆项目**
+1. 安装依赖
+
 ```bash
-git clone <repository-url>
-cd VolleyGo
+pip install -r requirement.txt
 ```
 
-2. **安装依赖**
+2. 配置环境变量
+
 ```bash
-pip install -r requirements.txt
+cp .env.example .env
 ```
 
-1. **配置环境变量**
-   
-   项目使用环境变量管理 API Key，避免敏感信息泄露。
-   
-   ```bash
-   # 复制配置模板
-   cp .env.example .env
-   
-   # 编辑 .env 文件，填入您的 API Key
-   # Windows: notepad .env
-   # Linux/Mac: nano .env
-   ```
-   
-   在 `.env` 文件中设置：
-   ```env
-   OPENAI_API_KEY=your_api_key_here
-   OPENAI_BASE_URL=https://api.chatanywhere.tech
-   ```
-   
-   📖 详细配置说明请查看 [配置指南](CONFIGURATION_GUIDE.md)
+编辑 `.env`：
 
-2. **启动应用**
-```bash
-# Flask API 服务器（推荐）
-python run_flask.py
+```env
+OPENAI_API_KEY=your_api_key_here
+OPENAI_BASE_URL=https://api.chatanywhere.tech
 ```
 
-1. **访问系统**
-   
-   打开浏览器访问 `http://localhost:5000`
+3. 启动服务
 
----
-
-### ✅ API 地址配置说明
-
-**已自动配置**：前端使用相对路径 `/api`，自动适配当前域名。
-
-- ✅ 本地开发：`http://localhost:5000` → API: `http://localhost:5000/api`
-- ✅ 服务器部署：`http://your-server.com` → API: `http://your-server.com/api`
-
-**无需手动配置，自动适配！**
-
----
-
-## 📂 项目结构
-
-```
-VolleyGo/
-│
-├── app.py                      # Streamlit主应用入口
-├── requirements.txt            # 项目依赖
-├── README.md                   # 项目文档
-│
-├── backend/                    # 后端代码
-│   ├── __init__.py
-│   ├── api/                   # API接口层
-│   │   ├── __init__.py
-│   │   └── volleyball_api.py  # 对外API接口
-│   ├── core/                  # 核心功能模块
-│   │   ├── __init__.py
-│   │   ├── pose_detector.py   # 姿态检测
-│   │   ├── video_processor.py # 视频处理
-│   │   ├── scorer.py          # 评分算法
-│   │   ├── sequence_analyzer.py    # 序列分析
-│   │   ├── trajectory_visualizer.py # 轨迹可视化
-│   │   └── video_generator.py      # 视频生成
-│   ├── services/              # 业务逻辑层
-│   │   ├── __init__.py
-│   │   └── volleyball_service.py   # 业务服务
-│   ├── models/                # 数据模型
-│   └── utils/                 # 工具函数
-│
-├── frontend/                   # 前端代码
-│   ├── __init__.py
-│   ├── components/            # UI组件
-│   │   ├── __init__.py
-│   │   ├── header.py         # 页面头部
-│   │   ├── score_card.py     # 评分卡片
-│   │   └── video_uploader.py # 视频上传
-│   ├── pages/                # 页面
-│   └── assets/               # 静态资源
-│
-├── config/                    # 配置文件
-│   ├── __init__.py
-│   └── settings.py           # 系统配置
-│
-├── data/                     # 数据目录
-│   ├── models/              # 模型文件
-│   └── templates/           # 动作模板
-│       └── default_template.json
-│
-├── output/                   # 输出文件
-│   └── (生成的视频等)
-│
-└── tests/                    # 测试代码
-    ├── unit/                # 单元测试
-    └── integration/         # 集成测试
-```
-
----
-
-## 📖 使用指南
-
-### 1. 动作分析
-
-#### 上传视频
-- 支持格式: MP4, AVI, MOV, MKV
-- 文件大小: ≤ 50MB
-- 视频时长: 3-10秒最佳
-
-#### 选择分析模式
-- **🎯 单帧分析（快速）**: 提取关键帧快速评估，适合初学者
-- **🎬 连续帧分析（详细）**: 完整动作序列深度分析，提供流畅度等指标
-
-#### 查看结果
-- 总分及分项得分
-- 雷达图可视化
-- 关卡等级评定
-- 个性化改进建议
-
-### 2. 视频可视化
-
-#### 生成可视化视频
-1. 上传原始视频
-2. 选择可视化类型:
-   - 🎥 骨架叠加（推荐）
-   - 🦴 纯骨架动画
-   - 📊 左右对比
-   - 📈 轨迹追踪
-3. 点击生成按钮
-4. 下载生成的视频
-
-### 3. 拍摄技巧
-
-#### 📹 拍摄要求
-- **角度**: 正面拍摄，相机与人平行
-- **距离**: 全身入镜，从头到脚完整显示
-- **光线**: 充足且均匀，避免逆光
-- **背景**: 简洁清爽，避免杂乱
-- **稳定**: 使用三脚架或稳定设备
-
-#### 👕 服装建议
-- 穿着贴身运动服
-- 避免过于宽松的衣物
-- 颜色与背景有对比度
-
----
-
-## 📊 评分标准
-
-### 总分构成 (100分)
-
-| 维度 | 分值 | 评分标准 |
-|------|------|----------|
-| **手臂姿态** | 40分 | 双臂伸直(165°)，夹角<30°，水平对称 |
-| **身体重心** | 30分 | 膝盖弯曲60-90°，重心下沉稳定 |
-| **触球位置** | 20分 | 接触点在腰腹前方，高度适中(45%身高) |
-| **整体稳定** | 10分 | 动作流畅连贯，姿态置信度高 |
-
-### 关卡等级
-
-- 🌱 **初级**: ≥50分 - 基础动作掌握
-- 🌟 **中级**: ≥70分 - 标准动作规范  
-- 🏆 **高级**: ≥85分 - 专业级别水准
-
----
-
-## 🔧 技术架构
-
-### 后端技术
-- **MediaPipe Pose**: 实时姿态检测（33个关键点）
-- **OpenCV**: 视频处理与帧提取
-- **NumPy & SciPy**: 数值计算与信号处理
-- **Python 3.8+**: 主要开发语言
-
-### 前端技术
-- **原生 JavaScript**: 纯前端实现，无需构建工具
-- **HTML5 & CSS3**: 现代化UI样式
-- **相对路径API**: 自动适配本地开发或服务器部署
-
-### 架构设计
-```
-┌─────────────────┐
-│  Frontend (HTML) │  ← 前端展示层（使用相对路径API）
-└────────┬────────┘
-         │
-┌────────▼────────┐
-│   Flask API     │  ← API接口层（RESTful）
-└────────┬────────┘
-         │
-┌────────▼────────┐
-│ Service Layer   │  ← 业务逻辑层
-└────────┬────────┘
-         │
-┌────────▼────────┐
-│   Core Modules  │  ← 核心功能层
-│  (Pose, Video,  │
-│   Score, etc.)  │
-└─────────────────┘
-```
-
----
-
-## 🎯 适用场景
-
-### 👥 目标用户
-- **排球初学者**: 学习标准动作，建立正确基础
-- **业余爱好者**: 自我训练，提升技术水平
-- **体育教练**: 辅助教学，量化评估学员
-- **学生研究者**: 姿态识别研究，运动分析
-
-### 💡 应用场景
-- 个人训练辅助
-- 线上教学工具
-- 训练营评估系统
-- 体育科研项目
-
----
-
-## 📝 版本历史
-
-### v3.0.0 (2025-10-31) - 重大重构
-- ✨ 全新架构：前后端分离，模块化设计
-- 🎨 现代化UI：全新Streamlit界面，参考专业设计
-- 📦 三层架构：API层、服务层、核心层清晰分离
-- 📚 完整文档：详细的使用指南和技术文档
-- 🔧 易于维护：组件化开发，便于扩展和调试
-
-### v2.1.0 (2025-10-28)
-- 🎥 新增4种动态视频可视化模式
-- 📈 改进轨迹追踪算法
-
-### v2.0.0 (2025-10-25)
-- 🎬 新增连续帧分析功能
-- 📊 流畅度、完整性、一致性评估
-
-### v1.0.0
-- 🎯 基础姿态识别与评分功能
-
----
-
-## 🚀 部署指南
-
-> 💡 **提示**：部署到服务器前，请先完成[快速开始](#🚀-快速开始)中的基础配置（克隆项目、安装依赖、配置环境变量）。
-
-### 服务器部署步骤
-
-#### 1. 完成基础配置
-
-按照[快速开始](#🚀-快速开始)部分完成：
-- ✅ 克隆项目到服务器
-- ✅ 安装依赖（`pip install -r requirements.txt`）
-- ✅ 配置 `.env` 文件（设置 API Key）
-
-#### 2. 启动服务
-
-根据您的需求选择启动方式：
-
-**方式 1：直接运行（简单测试）**
 ```bash
 python run_flask.py
 ```
-⚠️ 注意：这种方式仅适用于简单测试，不适合生产环境。
 
-**方式 2：使用 Gunicorn（生产环境，推荐）**
+4. 访问
+
+- 前端页面：`http://localhost:5000`
+- API 健康检查：`http://localhost:5000/api/health`
+
+## Docker 启动
+
+在 `docker/` 目录执行：
+
 ```bash
-# 安装 Gunicorn
-pip install gunicorn
-
-# 启动服务（4个工作进程）
-gunicorn -w 4 -b 0.0.0.0:5000 "run_flask:app"
+docker compose up --build
 ```
 
-**方式 3：使用 Nginx + Gunicorn（生产环境，最佳实践）**
+服务默认监听 `5000` 端口。
 
-1. 启动 Gunicorn（后台运行）：
-```bash
-gunicorn -w 4 -b 127.0.0.1:5000 "run_flask:app" --daemon
-```
+## API 一览
 
-2. 配置 Nginx 反向代理：
+### 健康检查
 
-创建 Nginx 配置文件（如 `/etc/nginx/sites-available/volleyball`）：
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;  # 替换为您的域名
+`GET /api/health`
 
-    location / {
-        proxy_pass http://127.0.0.1:5000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        
-        # WebSocket 支持（如果需要）
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-    }
-}
-```
+### 视频分析
 
-3. 启用配置并重启 Nginx：
-```bash
-sudo ln -s /etc/nginx/sites-available/volleyball /etc/nginx/sites-enabled/
-sudo nginx -t  # 测试配置
-sudo systemctl restart nginx
-```
+`POST /api/analyze/video`  
+`multipart/form-data`:
+- `video`: 视频文件（mp4/avi/mov/mkv）
+- `mode`: `single` 或 `sequence`
 
-#### 3. 验证部署
+### 可视化视频生成
 
-1. **访问服务**
-   - 如果使用方式1/2：访问 `http://your-server-ip:5000`
-   - 如果使用方式3：访问 `http://your-domain.com`
+`POST /api/visualize/video`  
+`multipart/form-data`:
+- `video`
+- `vis_type`: `overlay` / `skeleton` / `comparison` / `trajectory`
 
-2. **检查 API 连接**
-   - 打开浏览器开发者工具（F12）
-   - 查看 Network 标签页
-   - 确认 API 请求发送到正确地址（如 `http://your-server.com/api/health`）
-   - 检查请求是否成功（状态码 200）
+### 输出文件下载
 
-3. **验证功能**
-   - 测试视频上传和分析功能
-   - 测试 AI 教练功能
-   - 检查控制台是否有错误信息
+`GET /api/output/<filename>`
 
-### 常见部署问题
+### 战术题库
 
-#### Q: 前端能显示，但后端功能全部调用失败？
+`GET /api/tactics/questions?module=<模块名>&role=<角色名>`
 
-**A:** 这是典型的 API 地址配置问题。已解决：
-- ✅ 前端已改为相对路径 `/api`
-- ✅ 自动适配当前域名
-- ✅ 无需手动配置
+### 评分摘要
 
-如果仍有问题，检查：
-1. 后端服务是否正常运行
-2. 浏览器控制台是否有 CORS 错误
-3. 网络请求是否发送到正确的地址
+`POST /api/score/summary`
 
-#### Q: 如何确认 API 地址配置正确？
+### AI 教练
 
-**A:** 打开浏览器开发者工具（F12）：
-1. 查看 Network 标签页
-2. 找到 API 请求（如 `/api/health`）
-3. 确认请求地址为：`http://your-server.com/api/...`（而不是 `http://localhost:5000/api/...`）
+- `GET /api/ai-coach/test`
+- `POST /api/ai-coach/ask`
 
-#### Q: 部署后需要修改哪些配置？
+## 配置说明
 
-**A:** 
-- ✅ 无需修改前端代码（已使用相对路径）
-- ✅ 只需配置 `.env` 文件中的 API Key
-- ✅ 后端路由无需修改（已正确配置）
+- 全局配置：`config/settings.py`
+- 默认输出目录：`output/`
+- 默认模板：`data/templates/default_template.json`
+- 视频限制：默认 50MB，格式由 `flask_api.py` 与 `settings.py` 共同约束
+
+## 开发说明
+
+- 前端 API 基地址使用相对路径 `/api`（见 `frontend/js/api.js`）
+- Flask `static_folder` 指向 `frontend/`，因此无需单独前端服务器
+- 评分器默认在 `VolleyballService` 中使用 `v3`
+- 球检测默认尝试 YOLOv7（权重路径：`backend/core/yV7-tiny/weights/best.pt`）
+
+## 常见问题
+
+### 1. 启动后 AI 教练不可用
+
+检查：
+- `.env` 是否存在且 `OPENAI_API_KEY` 正确
+- 是否安装了 `openai`、`python-dotenv`
+- `OPENAI_BASE_URL` 是否是可访问的 OpenAI 兼容地址
+
+### 2. 视频分析慢或失败
+
+检查：
+- 视频是否过长/过大
+- 服务器是否具备足够 CPU/GPU/内存
+- YOLO 权重文件是否存在
+
+### 3. 依赖安装失败
+
+注意本项目依赖文件名是 **`requirement.txt`**（不是 `requirements.txt`）。
+
+## 版本备注
+
+本 README 已按当前仓库真实实现重写：`Flask + 静态前端 + REST API + 三层后端`。  
+若后续改为前后端分离部署（如 Vite/React + FastAPI），需同步更新本文档。
 
 ---
 
-## 🛠️ 开发指南
+## Roadmap
 
-### 安装开发依赖
-```bash
-pip install -r requirements.txt
-```
+- [ ] 增加自动化测试（单元测试 + API 集成测试）
+- [ ] 增加 CI（lint + test + build）
+- [ ] 将 AI 教练模型与提示词配置外置化
+- [ ] 增加前端多语言支持
+- [ ] 增加部署模板（Nginx + Gunicorn + HTTPS）
 
-### 运行测试
-```bash
-# 单元测试
-pytest tests/unit/
+## Contributing
 
-# 集成测试
-pytest tests/integration/
-```
+欢迎提交 Issue 和 PR。
 
-### 代码规范
-- 遵循PEP 8规范
-- 使用类型注解
-- 添加文档字符串
-- 保持模块独立性
+建议流程：
 
-### 添加新功能
-1. 在`backend/core/`添加核心功能模块
-2. 在`backend/services/`扩展业务逻辑
-3. 在`backend/api/`暴露API接口
-4. 在`frontend/components/`创建UI组件
-5. 在`app.py`中集成到主应用
+1. Fork 仓库并创建分支：`feature/xxx` 或 `fix/xxx`
+2. 完成代码与文档修改
+3. 本地自测关键流程（上传、分析、可视化、AI 问答）
+4. 提交 PR 并描述改动动机、影响范围、验证方式
 
----
+提交建议：
 
-## 🤝 贡献指南
+- 提交信息尽量语义化（如 `feat: ...`、`fix: ...`）
+- 避免把模型大文件或临时输出提交到仓库
+- 变更 API 时同步更新本文档
 
-欢迎提交Issue和Pull Request！
+## Changelog
 
-### 贡献流程
-1. Fork本项目
-2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 开启Pull Request
+当前仓库未维护独立 `CHANGELOG.md`。  
+建议后续按版本维护（例如 `vX.Y.Z`）并记录：
+- 新功能
+- 破坏性变更
+- 修复项
 
----
+## Security
 
-## 📄 许可证
+请勿在仓库中提交任何真实密钥或敏感配置：
 
-本项目采用 MIT 许可证。详见 [LICENSE](LICENSE) 文件。
+- `OPENAI_API_KEY`
+- 其他第三方服务 Token / API Key
 
----
+建议使用 `.env`（本地）或 CI/CD Secret（线上）管理密钥。
 
-## 📮 联系方式
+## License
 
-如有问题或建议，欢迎联系：
-- 📧 Email: 1037783681@qq.com
-- 💬 Issues: [GitHub Issues](https://github.com/your-repo/issues)
+本项目使用 MIT 许可证。
 
----
+## Acknowledgements
 
-## 🙏 致谢
+- [MediaPipe](https://github.com/google-ai-edge/mediapipe)
+- [OpenCV](https://opencv.org/)
+- [PyTorch](https://pytorch.org/)
+- [Flask](https://flask.palletsprojects.com/)
+- [Tailwind CSS](https://tailwindcss.com/)
 
-- [MediaPipe](https://google.github.io/mediapipe/) - 提供强大的姿态识别技术
-- [Streamlit](https://streamlit.io/) - 简洁高效的Web框架
-- [OpenCV](https://opencv.org/) - 计算机视觉基础库
+## Maintainer Notes
 
----
-
-💖 **Made with passion for volleyball training**
-
-🌟 如果这个项目对你有帮助，请给个Star！
+- 当前依赖文件名是 `requirement.txt`（单数）
+- 球检测默认走 YOLOv7，本地需有对应权重文件
+- 线上部署推荐使用 Gunicorn（而非 Flask debug server）
