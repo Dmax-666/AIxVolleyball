@@ -80,7 +80,7 @@ AIxVolleyball/
 
 ## 快速开始（本地）
 
-1. 安装依赖
+1. 安装项目依赖
 
 ```bash
 pip install -r requirement.txt
